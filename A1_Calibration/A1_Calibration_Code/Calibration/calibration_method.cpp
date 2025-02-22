@@ -127,7 +127,7 @@ bool Calibration::calibration(
                0, 0, 1);
 
     /// define and initialize a 3 by 4 matrix
-    Matrix34 P(1.1, 2.2, 3.3, 0,
+    Matrix34 C(1.1, 2.2, 3.3, 0,
                0, 2.2, 3.3, 1,
                0, 0, 1, 1);
 
@@ -201,12 +201,30 @@ bool Calibration::calibration(
                  "\tIMPORTANT: don't forget to write your recovered parameters to the above variables." << std::endl;
 
     // TODO: check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
+    int num_3d_points = points_3d.size();
+    int num_2d_points = points_2d.size();
+
+    if (num_3d_points < 6 || num_2d_points < 6 || num_3d_points != num_2d_points) {
+        return false;
+    }
 
     // TODO: construct the P matrix (so P * m = 0).
+    int num_rows = num_3d_points*2;
+
+    Matrix P(num_rows, 12, 0.0);
+    for (int i = 0; i < num_3d_points; i++) {
+        Vector3D& P1 = points_3d[i];
+        Vector2D& P2= points_2d[i];
+
+        P.set_row(2*i, {P1.x, P1.y, P1.z, 1, 0, 0, 0, 0, -P2.x*P1.x, -P2.x*P1.y, -P2.x*P1.z, -P2.x});
+        P.set_row(2*i+1, {0, 0, 0, 0, P1.x, P1.y, P1.z, 1, -P2.y*P1.x, -P2.y*P1.y, -P2.y*P1.z, -P2.y});       ;
+    }
 
     // TODO: solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
     //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
     //             should be very close to your input images points.
+
+
 
     // TODO: extract intrinsic parameters from M.
 
