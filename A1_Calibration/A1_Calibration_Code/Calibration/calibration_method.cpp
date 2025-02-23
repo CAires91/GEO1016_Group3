@@ -105,18 +105,18 @@ bool Calibration::calibration(
 
     // Define an m-by-n double valued matrix.
     // Here I use the above array to initialize it. You can also use A(i, j) to initialize/modify/access its elements.
-    const int m = 6, n = 5;
-    Matrix A(m, n, array.data());    // 'array.data()' returns a pointer to the array.
-    std::cout << "M: \n" << A << std::endl;
+    // const int m = 6, n = 5;
+    // Matrix A(m, n, array.data());    // 'array.data()' returns a pointer to the array.
+    // std::cout << "M: \n" << A << std::endl;
 
     /// define a 3 by 4 matrix (and all elements initialized to 0.0)
-    Matrix M(3, 4, 0.0);
+    Matrix M1(3, 4, 0.0);
 
     /// set first row by a vector
-    M.set_row(0, Vector4D(1.1, 2.2, 3.3, 4.4));
+    M1.set_row(0, Vector4D(1.1, 2.2, 3.3, 4.4));
 
     /// set second column by a vector
-    M.set_column(1, Vector3D(5.5, 5.5, 5.5));
+    M1.set_column(1, Vector3D(5.5, 5.5, 5.5));
 
     /// define a 3 by 3 matrix (and all elements initialized to 0.0)
     Matrix33 B;
@@ -146,34 +146,34 @@ bool Calibration::calibration(
     double value = W(1, 2);
 
     /// get the last column of a matrix
-    Vector last_column = W.get_column(W.cols() - 1);
+    // Vector last_column = W.get_column(W.cols() - 1);
 
     /// define a 3 by 3 identity matrix
     Matrix33 I = Matrix::identity(3, 3, 1.0);
 
     /// matrix-vector product
-    Vector3D v = M * Vector4D(1, 2, 3, 4); // M is 3 by 4
+    Vector3D v = M1 * Vector4D(1, 2, 3, 4); // M is 3 by 4
 
-    Matrix U(m, m, 0.0);   // initialized with 0s
-    Matrix S(m, n, 0.0);   // initialized with 0s
-    Matrix V(n, n, 0.0);   // initialized with 0s
+    // Matrix U(m, m, 0.0);   // initialized with 0s
+    // Matrix S(m, n, 0.0);   // initialized with 0s
+    // Matrix V(n, n, 0.0);   // initialized with 0s
 
     // Compute the SVD decomposition of A
-    svd_decompose(A, U, S, V);
+    // svd_decompose(A, U, S, V);
 
     // Now let's check if the SVD result is correct
 
-    // Check 1: U is orthogonal, so U * U^T must be identity
-    std::cout << "U*U^T: \n" << U * transpose(U) << std::endl;
-
-    // Check 2: V is orthogonal, so V * V^T must be identity
-    std::cout << "V*V^T: \n" << V * transpose(V) << std::endl;
-
-    // Check 3: S must be a diagonal matrix
-    std::cout << "S: \n" << S << std::endl;
-
-    // Check 4: according to the definition, A = U * S * V^T
-    std::cout << "M - U * S * V^T: \n" << A - U * S * transpose(V) << std::endl;
+    // // Check 1: U is orthogonal, so U * U^T must be identity
+    // std::cout << "U*U^T: \n" << U * transpose(U) << std::endl;
+    //
+    // // Check 2: V is orthogonal, so V * V^T must be identity
+    // std::cout << "V*V^T: \n" << V * transpose(V) << std::endl;
+    //
+    // // Check 3: S must be a diagonal matrix
+    // std::cout << "S: \n" << S << std::endl;
+    //
+    // // Check 4: according to the definition, A = U * S * V^T
+    // std::cout << "M - U * S * V^T: \n" << A - U * S * transpose(V) << std::endl;
 
     // Compute the inverse of a matrix
     Matrix invT;
@@ -201,8 +201,11 @@ bool Calibration::calibration(
                  "\tIMPORTANT: don't forget to write your recovered parameters to the above variables." << std::endl;
 
     // TODO: check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
+
+
     int num_3d_points = points_3d.size();
     int num_2d_points = points_2d.size();
+
 
     if (num_3d_points < 6 || num_2d_points < 6 || num_3d_points != num_2d_points) {
         return false;
@@ -225,9 +228,98 @@ bool Calibration::calibration(
     //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
     //             should be very close to your input images points.
 
+    const int m = 12, n = P.rows();
+
+    Matrix U(m, m, 0.0);   // initialized with 0s
+    Matrix S(m, n, 0.0);   // initialized with 0s
+    Matrix V(n, n, 0.0);   // initialized with 0s
+
+    // Compute the SVD decomposition of A
+    svd_decompose(P, U, S, V);
+
+    // Check 1: U is orthogonal, so U * U^T must be identity
+    std::cout << "U*U^T: \n" << U * transpose(U) << std::endl;
+
+    // Check 2: V is orthogonal, so V * V^T must be identity
+    std::cout << "V*V^T: \n" << V * transpose(V) << std::endl;
+
+    // Check 3: S must be a diagonal matrix
+    std::cout << "S: \n" << S << std::endl;
+
+    // Check 4: according to the definition, P = U * S * V^T
+    std::cout << "M - U * S * V^T: \n" << P - U * S * transpose(V) << std::endl;
+
+    /// get the last column of the V matrix
+
+    Vector m_vector = V.get_column(V.cols() - 1);
+
+    std::cout <<"m_vector: \n" << m_vector << std::endl;
+
+    /// build m matrix
+
+    Matrix SVD_m_matrix(3, 4, 0.0);
+
+    int idx = 0;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 4; j++) {
+            SVD_m_matrix[i][j] = m_vector[idx++];
+        }
+    }
+
+    std::cout <<"SVD_m_matrix: \n" << SVD_m_matrix << std::endl;
+
+    // Normalize SVD_m_matrix
+
+    double normalization = SVD_m_matrix(2, 3);
+
+    std::cout <<"normalization: \n" << normalization << std::endl;
+
+    Matrix M = SVD_m_matrix/normalization;
+
+    /// get a3 from SVD_m_matrix
+    //
+    // double a3_1 = SVD_m_matrix(2, 0);
+    //
+    // double a3_2 = SVD_m_matrix(2, 1);
+    //
+    // double a3_3 = SVD_m_matrix(2, 2);
+    //
+    // Vector3D a3 = Vector3D(a3_1, a3_2, a3_3);
+    //
+    // std::cout << "a3: \n" << a3 << std::endl;
+    //
+    // double ro = 1/norm(a3);
+    //
+    // Matrix M = SVD_m_matrix*ro;
+
+    std::cout << "M: \n" << M << std::endl;
+
+    /// check if SVD_m_matrix is correct by multiplying it by a 4x3 matrix formed by the 3D Points
+
+    Matrix Points(4, num_3d_points, 0.0);
+    for (int i = 0; i < num_3d_points; i++) {
+        Vector3D PX = points_3d[i];
+
+        Points.set_column(i, {PX.x(), PX.y(), PX.z(), 1});
+    }
+
+    std::cout << "Points: \n" << Points << std::endl;
+
+    // Perform matrix multiplication (SVD_m_matrix * Points4D)
+    Matrix Test = M * Points;
+
+    std::cout << "Result of M * Points: \n" << Test << std::endl;
+
+
+
+    // if (pi0.x() == points_2d[0].x() && pi0.y() == points_2d[0].y()) {
+    //     std:: cout <<"YAY" << std::endl;
+    // }
+
 
 
     // TODO: extract intrinsic parameters from M.
+
 
     // TODO: extract extrinsic parameters from M.
 
