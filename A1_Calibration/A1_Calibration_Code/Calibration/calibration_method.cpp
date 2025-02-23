@@ -268,7 +268,7 @@ bool Calibration::calibration(
 
     std::cout <<"SVD_m_matrix: \n" << SVD_m_matrix << std::endl;
 
-    // Normalize SVD_m_matrix
+    // Normalize SVD_m_matrix: almost working
 
     double normalization = SVD_m_matrix(2, 3);
 
@@ -276,7 +276,7 @@ bool Calibration::calibration(
 
     Matrix M = SVD_m_matrix/normalization;
 
-    /// get a3 from SVD_m_matrix
+    // get a3 from SVD_m_matrix: not working
     //
     // double a3_1 = SVD_m_matrix(2, 0);
     //
@@ -290,11 +290,11 @@ bool Calibration::calibration(
     //
     // double ro = 1/norm(a3);
     //
-    // Matrix M = SVD_m_matrix*ro;
+    // Matrix M = SVD_m_matrix*(ro*-1);
+    //
+    // std::cout << "M: \n" << M << std::endl;
 
-    std::cout << "M: \n" << M << std::endl;
-
-    /// check if SVD_m_matrix is correct by multiplying it by a 4x3 matrix formed by the 3D Points
+    /// check if M is correct by multiplying it by a 4x3 matrix formed by the 3D Points
 
     Matrix Points(4, num_3d_points, 0.0);
     for (int i = 0; i < num_3d_points; i++) {
