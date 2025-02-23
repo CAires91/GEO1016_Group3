@@ -137,7 +137,7 @@ bool Calibration::calibration(
     W.set_row(0, {0, 1, 2, 3, 4, 5, 6, 7, 8}); // {....} is equivalent to a std::vector<double>
 
     /// get the number of rows.
-    int num_rows = W.rows();
+    int num_rows1 = W.rows();
 
     /// get the number of columns.
     int num_cols = W.cols();
@@ -213,12 +213,13 @@ bool Calibration::calibration(
 
     Matrix P(num_rows, 12, 0.0);
     for (int i = 0; i < num_3d_points; i++) {
-        Vector3D& P1 = points_3d[i];
-        Vector2D& P2= points_2d[i];
+        Vector3D P1 = points_3d[i];
+        Vector2D P2 = points_2d[i];
 
-        P.set_row(2*i, {P1.x, P1.y, P1.z, 1, 0, 0, 0, 0, -P2.x*P1.x, -P2.x*P1.y, -P2.x*P1.z, -P2.x});
-        P.set_row(2*i+1, {0, 0, 0, 0, P1.x, P1.y, P1.z, 1, -P2.y*P1.x, -P2.y*P1.y, -P2.y*P1.z, -P2.y});       ;
+        P.set_row(2*i, {P1.x(), P1.y(), P1.z(), 1, 0, 0, 0, 0, - P2.x() * P1.x(), -P2.x() * P1.y(), - P2.x() *P1.z(), - P2.x()});
+        P.set_row(2*i+1, {0, 0, 0, 0, P1.x(), P1.y(), P1.z(), 1, - P2.y() * P1.x(), -P2.y() * P1.y(), - P2.y() *P1.z(), - P2.y()});       ;
     }
+    std::cout << "P: \n" << P << std::endl;
 
     // TODO: solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
     //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
