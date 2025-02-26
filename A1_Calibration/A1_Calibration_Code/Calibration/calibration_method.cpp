@@ -200,18 +200,16 @@ bool Calibration::calibration(
                  "\t\t- t: a 3D vector encoding camera location.\n"
                  "\tIMPORTANT: don't forget to write your recovered parameters to the above variables." << std::endl;
 
-    // TODO: check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
-
+    // check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
 
     int num_3d_points = points_3d.size();
     int num_2d_points = points_2d.size();
-
 
     if (num_3d_points < 6 || num_2d_points < 6 || num_3d_points != num_2d_points) {
         return false;
     }
 
-    // TODO: construct the P matrix (so P * m = 0).
+    // construct the P matrix (so P * m = 0).
     int num_rows = num_3d_points*2;
 
     Matrix P(num_rows, 12, 0.0);
@@ -228,7 +226,7 @@ bool Calibration::calibration(
     //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
     //             should be very close to your input images points.
 
-    const int m = 12, n = P.rows();
+    const int m = 2*num_3d_points, n = 12;
 
     Matrix U(m, m, 0.0);   // initialized with 0s
     Matrix S(m, n, 0.0);   // initialized with 0s
@@ -251,70 +249,67 @@ bool Calibration::calibration(
 
     /// get the last column of the V matrix
 
-    Vector m_vector = V.get_column(V.cols() - 1);
+    std::cout <<"V: \n" << V << std::endl;
 
-    std::cout <<"m_vector: \n" << m_vector << std::endl;
+    Vector m_vector = V.get_column(V.cols() - 1);
 
     /// build m matrix
 
-    Matrix SVD_m_matrix(3, 4, 0.0);
+    Matrix m_matrix(3, 4, 0.0);
 
     int idx = 0;
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 4; j++) {
-            SVD_m_matrix[i][j] = m_vector[idx++];
+            m_matrix[i][j] = m_vector[idx++];
         }
     }
 
-    std::cout <<"SVD_m_matrix: \n" << SVD_m_matrix << std::endl;
+    std::cout <<"m_matrix: \n" << m_matrix << std::endl;
 
-    // Normalize SVD_m_matrix: almost working
 
-    double normalization = SVD_m_matrix(2, 3);
+    // get a3 from m_matrix:
 
-    std::cout <<"normalization: \n" << normalization << std::endl;
+    double a3_1 = m_matrix(2, 0);
 
-    Matrix M = SVD_m_matrix/normalization;
+    double a3_2 = m_matrix(2, 1);
 
-    // get a3 from SVD_m_matrix: not working
-    //
-    // double a3_1 = SVD_m_matrix(2, 0);
-    //
-    // double a3_2 = SVD_m_matrix(2, 1);
-    //
-    // double a3_3 = SVD_m_matrix(2, 2);
-    //
-    // Vector3D a3 = Vector3D(a3_1, a3_2, a3_3);
-    //
-    // std::cout << "a3: \n" << a3 << std::endl;
-    //
-    // double ro = 1/norm(a3);
-    //
-    // Matrix M = SVD_m_matrix*(ro*-1);
-    //
-    // std::cout << "M: \n" << M << std::endl;
+    double a3_3 = m_matrix(2, 2);
 
-    /// check if M is correct by multiplying it by a 4x3 matrix formed by the 3D Points
+    Vector3D a3 = Vector3D(a3_1, a3_2, a3_3);
 
-    Matrix Points(4, num_3d_points, 0.0);
-    for (int i = 0; i < num_3d_points; i++) {
-        Vector3D PX = points_3d[i];
+    std::cout << "a3: \n" << a3 << std::endl;
 
-        Points.set_column(i, {PX.x(), PX.y(), PX.z(), 1});
+    double ro = 1/norm(a3);
+
+    Matrix M = (ro*1)*m_matrix;
+
+    std::cout << "M: \n" << M << std::endl;
+
+    // // cross-check points
+
+    for (const Vector3D& point_test : points_3d) {
+        std::cout << "\nPoint: \n" << point_test << std::endl;
+
+        Matrix point_test_matrix(4, 1, 1.0);
+
+        // Fill the first three elements with the 3D point coordinates
+        for (int i = 0; i < 3; i++) {
+            point_test_matrix(i, 0) = point_test[i];
+        }
+
+        Matrix s_pi = M * point_test_matrix;
+
+        double su = s_pi(0, 0);
+        double sv = s_pi(1, 0);
+        double sc = s_pi(2, 0);
+
+        double x = su / sc;
+        double y = sv / sc;
+
+        std::cout << "Computed x: " << x << std::endl;
+        std::cout << "Computed y: " << y << std::endl;
     }
 
-    std::cout << "Points: \n" << Points << std::endl;
-
-    // Perform matrix multiplication (SVD_m_matrix * Points4D)
-    Matrix Test = M * Points;
-
-    std::cout << "Result of M * Points: \n" << Test << std::endl;
-
-
-
-    // if (pi0.x() == points_2d[0].x() && pi0.y() == points_2d[0].y()) {
-    //     std:: cout <<"YAY" << std::endl;
-    // }
 
 
 
@@ -322,6 +317,7 @@ bool Calibration::calibration(
 
 
     // TODO: extract extrinsic parameters from M.
+
 
     // TODO: make sure the recovered parameters are passed to the corresponding variables (fx, fy, cx, cy, s, R, and t)
 
