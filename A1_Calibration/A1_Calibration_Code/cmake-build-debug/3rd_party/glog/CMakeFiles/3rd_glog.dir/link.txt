@@ -1,0 +1,2 @@
+C:\PROGRA~1\JETBRA~1\CLION2~1.2\bin\mingw\bin\ar.exe qc ..\..\lib\lib3rd_glog.a CMakeFiles/3rd_glog.dir/logging.cc.obj
+C:\PROGRA~1\JETBRA~1\CLION2~1.2\bin\mingw\bin\ranlib.exe ..\..\lib\lib3rd_glog.a

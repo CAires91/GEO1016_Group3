@@ -201,8 +201,43 @@ bool Calibration::calibration(
                  "\tIMPORTANT: don't forget to write your recovered parameters to the above variables." << std::endl;
 
     // TODO: check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
+    int num_2d_points = points_2d.size();  // Get the number of 2d points
+    int num_3d_points = points_3d.size();  // Get the number of 3d points
+
+    if (num_2d_points >= 6 && num_3d_points >= 6 && num_2d_points == num_3d_points) {
+        std::cout << "Input is valid. Proceed with calibration..." << std::endl;
+    } else {
+        std::cerr << "Error: Input is invalid." << std::endl;
+        return false;
+    }
 
     // TODO: construct the P matrix (so P * m = 0).
+    int num_rows_P = 2*num_3d_points;
+
+    Matrix P1(num_rows_P, 12, 0.0); // Initialize Matrix P as a 2n x 12 matrix
+    for (int i = 0; i < num_rows_P; i++) {
+        // Get 3d points (in homogeneous coordinates)
+        Vector3D P_i = points_3d[i];    // Use vector3D class
+        double X = P_i.x();             // Use x() function
+        double Y = P_i.y();
+        double Z = P_i.z();
+
+        // Get the 2d points
+        Vector2D p_i = points_2d[i];
+        double u = p_i.x();
+        double v = p_i.y();
+
+        // First row of matrix for the correspondence points
+        P1.set_row(2*i, {X, Y, Z, 1, 0, 0, 0, 0, -u*X, -u*Y, -u*Z, -u});
+
+        // Second row of matrix for the correspondence points
+        P1.set_row(2*i+1, {0, 0, 0, 0, X, Y, Z, 1, -v*X, -v*Y, -v*Z, -v});
+    }
+
+    // Print the P matrix
+    std::cout << "P matrix:\n" << P1 << std::endl;
+
+
 
     // TODO: solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
     //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
