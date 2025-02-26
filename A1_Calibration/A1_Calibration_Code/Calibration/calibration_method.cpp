@@ -279,22 +279,23 @@ bool Calibration::calibration(
 
     std::cout << "a3: \n" << a3 << std::endl;
 
-    double ro = 1/norm(a3);
+    // TODO: Handle rho
 
-    Matrix M = (ro*1)*m_matrix;
+    double rho = 1/norm(a3);
+
+    Matrix M = (rho*-1)*m_matrix;
 
     std::cout << "M: \n" << M << std::endl;
 
     // // cross-check points
 
-    for (const Vector3D& point_test : points_3d) {
-        std::cout << "\nPoint: \n" << point_test << std::endl;
+    for (const Vector3D& points: points_3d) {
+        std::cout << "\nPoint: \n" << points << std::endl;
 
         Matrix point_test_matrix(4, 1, 1.0);
 
-        // Fill the first three elements with the 3D point coordinates
         for (int i = 0; i < 3; i++) {
-            point_test_matrix(i, 0) = point_test[i];
+            point_test_matrix(i, 0) = points[i];
         }
 
         Matrix s_pi = M * point_test_matrix;
@@ -309,9 +310,6 @@ bool Calibration::calibration(
         std::cout << "Computed x: " << x << std::endl;
         std::cout << "Computed y: " << y << std::endl;
     }
-
-
-
 
     // TODO: extract intrinsic parameters from M.
 
