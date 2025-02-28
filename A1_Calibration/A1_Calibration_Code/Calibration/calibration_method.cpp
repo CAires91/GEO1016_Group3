@@ -312,10 +312,104 @@ bool Calibration::calibration(
     }
 
     // TODO: extract intrinsic parameters from M.
+    // calculate a1 using vector3d
+    double a1_1 = M(0, 0);
+    double a1_2 = M(0, 1);
+    double a1_3 = M(0, 2);
+    Vector3D a1 = Vector3D(a1_1, a1_2, a1_3);
+    std::cout << "a1: " << a1 << std::endl;
+
+    // calculate a2 using vector3d
+    double a2_1 = M(1, 0);
+    double a2_2 = M(1, 1);
+    double a2_3 = M(1, 2);
+    Vector3D a2 = Vector3D(a2_1, a2_2, a2_3);
+    std::cout << "a2: " << a2 << std::endl;
+    std::cout << "rho: " << rho << std::endl;
+    // calculate cx = rho^2 *(a1 * a3)
+    cx = rho*rho*dot(a1, a3);
+    std::cout << "cx: " << cx << std::endl;
+
+    // calculate cy = rho^2 *(a2 * a3)
+    cy = rho*rho*dot(a2, a3);
+    std::cout << "cy: " << cy << std::endl;
+
+
+
+    // calculate cos(ø) = ((a1*a3)*(a2*a3))/(||a1*a3||*||a2*a3||)
+    Vector3D cross_a1_a3 = cross(a1, a3);
+    Vector3D cross_a2_a3 = cross(a2, a3);
+    double cos_theta = (dot(a1, a3)*dot(a2, a3))/(norm(cross_a1_a3)*norm(cross_a2_a3));
+
+    // calculate alpha= rho^2 * ||a1*a3|| * sin(ø)
+    double alpha = rho*rho*norm(cross_a1_a3)*sqrt(1-cos_theta*cos_theta);
+    std::cout << "alpha: " << alpha << std::endl;
+
+    // calculate beta = rho^2 * ||a2*a3|| * sin(ø)
+    double beta = rho*rho*norm(cross_a2_a3)*sqrt(1-cos_theta*cos_theta);
+    std::cout << "beta: " << beta << std::endl;
+
+    // calculate fx = alpha
+    fx= alpha;
+    std::cout << "fx: " << fx << std::endl;
+
+    // calculate fy = beta / sin(ø)
+    fy = beta/sqrt(1-cos_theta*cos_theta);
+    std::cout << "fy: " << fy << std::endl;
+
+    // calculate s = -alpha * cot(ø)
+    s = -alpha/tan(acos(cos_theta));
+    std::cout << "s: " << s << std::endl;
+
+
+
 
 
     // TODO: extract extrinsic parameters from M.
+    // calculate r1 = (a2*a3)/||a2*a3||
+    Vector3D r1 = Vector3D(
+    cross_a2_a3.x() / norm(cross_a2_a3),
+    cross_a2_a3.y() / norm(cross_a2_a3),
+    cross_a2_a3.z() / norm(cross_a2_a3)
+);
+    std::cout << "r1: " << r1 << std::endl;
 
+    // calculate r3= rho * a3
+    Vector3D r3 = rho*a3;
+    std::cout << "r3: " << r3 << std::endl;
+
+    // calculate r2 = r3 x r1
+    Vector3D r2 = cross(r3, r1);
+    std::cout << "r2: " << r2 << std::endl;
+
+    //calculate t= rho*K-1*b
+    double b1 = M(0, 3);
+    double b2 = M(1, 3);
+    double b3 = M(2, 3);
+    Vector3D b = Vector3D(b1,b2,b3);
+    std::cout << "b: " << b << std::endl;
+
+    Matrix33 K(fx, s, cx,
+               0, fy, cy,
+               0, 0, 1);
+    t= rho*inverse(K)*b;
+    std::cout << "t: " << t << std::endl;
+
+    //calculate R
+    R = Matrix33(r1.x(), r1.x(), r1.x(),
+                 r2.y(), r2.y(), r2.y(),
+                 r3.z(), r3.z(), r3.z());
+    std::cout << "R: " << R << std::endl;
+    //test if these values are correct by feeding it a 3D point and checking if the 2D point is correct p=K[R t]P
+    Vector3D test_point = Vector3D(0,2,2);
+
+    Matrix34 M_test(R(0,0), R(0,1), R(0,2), t.x(),
+                    R(1,0), R(1,1), R(1,2), t.y(),
+                    R(2,0), R(2,1), R(2,2), t.z());
+
+    Vector3D p_test = K*M_test*Vector4D(test_point.x(), test_point.y(), test_point.z(), 1);
+    // Vector3D p_test = K*R*t;
+    std::cout << "p_test: " << p_test << std::endl;
 
     // TODO: make sure the recovered parameters are passed to the corresponding variables (fx, fy, cx, cy, s, R, and t)
 
@@ -323,9 +417,6 @@ bool Calibration::calibration(
                  "\t\tupdate the rendering using your recovered camera parameters. This can help you to visually check\n"
                  "\t\tif your calibration is successful or not.\n\n" << std::flush;
     return false;
-}
-
-
 
 
 
