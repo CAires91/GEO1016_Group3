@@ -127,9 +127,9 @@ bool Calibration::calibration(
                0, 0, 1);
 
     /// define and initialize a 3 by 4 matrix
-    Matrix34 P(1.1, 2.2, 3.3, 0,
-               0, 2.2, 3.3, 1,
-               0, 0, 1, 1);
+    // Matrix34 P(1.1, 2.2, 3.3, 0,
+               // 0, 2.2, 3.3, 1,
+               // 0, 0, 1, 1);
 
     /// define a 15 by 9 matrix (and all elements initialized to 0.0)
     Matrix W(15, 9, 0.0);
@@ -204,18 +204,19 @@ bool Calibration::calibration(
     int num_2d_points = points_2d.size();  // Get the number of 2d points
     int num_3d_points = points_3d.size();  // Get the number of 3d points
 
-    if (num_2d_points >= 6 && num_3d_points >= 6 && num_2d_points == num_3d_points) {
-        std::cout << "Input is valid. Proceed with calibration..." << std::endl;
-    } else {
-        std::cerr << "Error: Input is invalid." << std::endl;
+    if (num_2d_points < 6 || num_3d_points < 6 || num_2d_points != num_3d_points) {
+        std::cerr << "Error: Input is invalid. At least 6 correspondences are required" << std::endl;
         return false;
     }
 
+    std::cout << "Input is valid. Proceed with calibration..." << std::endl;
+
     // TODO: construct the P matrix (so P * m = 0).
     int num_rows_P = 2*num_3d_points;
+    int num_cols_P = 12;
 
-    Matrix P1(num_rows_P, 12, 0.0); // Initialize Matrix P as a 2n x 12 matrix
-    for (int i = 0; i < num_rows_P; i++) {
+    Matrix P(num_rows_P, num_cols_P, 0.0); // Initialize Matrix P as a 2n x 12 matrix filled with zeroes
+    for (int i = 0; i < num_3d_points; i++) {
         // Get 3d points (in homogeneous coordinates)
         Vector3D P_i = points_3d[i];    // Use vector3D class
         double X = P_i.x();             // Use x() function
@@ -228,14 +229,14 @@ bool Calibration::calibration(
         double v = p_i.y();
 
         // First row of matrix for the correspondence points
-        P1.set_row(2*i, {X, Y, Z, 1, 0, 0, 0, 0, -u*X, -u*Y, -u*Z, -u});
+        P.set_row(2*i, {X, Y, Z, 1, 0, 0, 0, 0, -u*X, -u*Y, -u*Z, -u});
 
         // Second row of matrix for the correspondence points
-        P1.set_row(2*i+1, {0, 0, 0, 0, X, Y, Z, 1, -v*X, -v*Y, -v*Z, -v});
+        P.set_row(2*i+1, {0, 0, 0, 0, X, Y, Z, 1, -v*X, -v*Y, -v*Z, -v});
     }
 
     // Print the P matrix
-    std::cout << "P matrix:\n" << P1 << std::endl;
+    std::cout << "P matrix:\n" << P << std::endl;
 
 
 
