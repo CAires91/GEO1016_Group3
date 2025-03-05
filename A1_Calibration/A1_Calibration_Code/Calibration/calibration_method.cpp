@@ -283,7 +283,7 @@ bool Calibration::calibration(
 
     std::cout << "a3: \n" << a3 << std::endl;
 
-    double rho = 1 / norm(a3);
+    double rho = -1 / norm(a3);
 
     Matrix M = rho * m_matrix;
 
@@ -398,18 +398,6 @@ bool Calibration::calibration(
     std::cout << "s: " << s << std::endl;
 
     // TODO: extract extrinsic parameters from M.
-    // calculate r1 = (a2*a3)/||a2*a3||
-
-    Vector3D r1 = cross_a2_a3 / norm_cross_a2_a3;
-    std::cout << "r1: " << r1 << std::endl;
-
-    // calculate r3= rho * a3
-    Vector3D r3 = rho * a3;
-    std::cout << "r3: " << r3 << std::endl;
-
-    // calculate r2 = r3 x r1
-    Vector3D r2 = cross(r3, r1);
-    std::cout << "r2: " << r2 << std::endl;
 
     //calculate t= rho*K-1*b
     double b1 = m_matrix(0, 3);
@@ -427,6 +415,27 @@ bool Calibration::calibration(
 
     t = rho * inverse(K) * b;
     std::cout << "t: " << t << std::endl;
+
+    // if t(2) < 0, then rho = -rho
+    if (t.z() < 0) {
+        rho = -rho;
+        t = rho * inverse(K) * b;
+    }
+
+    // calculate r1 = (a2*a3)/||a2*a3||
+
+    Vector3D r1 = cross_a2_a3 / norm_cross_a2_a3;
+    std::cout << "r1: " << r1 << std::endl;
+
+    // calculate r3= rho * a3
+    Vector3D r3 = rho * a3;
+    std::cout << "r3: " << r3 << std::endl;
+
+    // calculate r2 = r3 x r1
+    Vector3D r2 = cross(r3, r1);
+    std::cout << "r2: " << r2 << std::endl;
+
+
 
     //calculate R
     R = Matrix33(r1.x(), r1.y(), r1.z(),
