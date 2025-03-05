@@ -45,7 +45,6 @@ bool Calibration::calibration(
     Matrix33 &R, /// output: the 3x3 rotation matrix encoding camera rotation.
     Vector3D &t) /// output：a 3D vector encoding camera translation. {
 {
-    std::cout << "\nTODO: implement the 'calibration()' function in the file 'Calibration/calibration_method.cpp'\n\n";
 
     std::cout << "[Liangliang]:\n"
             "\tIn this assignment, two essential data structures, 'Matrix' and 'Vector', are provided for the\n"
@@ -64,129 +63,6 @@ bool Calibration::calibration(
             "\t    - ensure that your code compiles and can reproduce your results WITHOUT ANY modification.\n\n" <<
             std::flush;
 
-    /// Below are a few examples showing some useful data structures and functions.
-
-    // This is a 1D array of 'double' values. Alternatively, you can use 'double mat[25]' but you cannot change it
-    // length. With 'std::vector', you can append/delete/insert elements, and much more. The 'std::vector' can store
-    // not only 'double', but also any other types of objects. In case you may want to learn more about 'std::vector'
-    // check here: https://en.cppreference.com/w/cpp/container/vector
-    std::vector<double> array = {1, 3, 3, 4, 7, 6, 2, 8, 2, 8, 3, 2, 4, 9, 1, 7, 3, 23, 2, 3, 5, 2, 1, 5, 8, 9, 22};
-    array.push_back(5); // append 5 to the array (so the size will increase by 1).
-    array.insert(array.end(), 10, 3); // append ten 3 (so the size will grow by 10).
-
-    /// To access the value of an element.
-    double a = array[2];
-    //
-    // /// define a 2D vector/point
-    // Vector2D b(1.1, 2.2);
-
-    /// define a 3D vector/point
-    Vector3D c(1.1, 2.2, 3.3);
-
-    /// get the Cartesian coordinates of a (a is treated as Homogeneous coordinates)
-    Vector2D p = c.cartesian();
-
-    /// get the Homogeneous coordinates of p
-    Vector3D q = p.homogeneous();
-
-    /// the length of a vector
-    double len = p.length();
-    /// the squared length of a vector
-    double sqr_len = p.length2();
-
-    /// the dot product of two vectors
-    double dot_prod = dot(p, q);
-
-    /// the cross product of two vectors
-    Vector cross_prod = cross(c, q);
-
-    /// normalize this vector
-    cross_prod.normalize();
-
-    // Define an m-by-n double valued matrix.
-    // Here I use the above array to initialize it. You can also use A(i, j) to initialize/modify/access its elements.
-    // const int m = 6, n = 5;
-    // Matrix A(m, n, array.data());    // 'array.data()' returns a pointer to the array.
-    // std::cout << "M: \n" << A << std::endl;
-
-    /// define a 3 by 4 matrix (and all elements initialized to 0.0)
-    Matrix M1(3, 4, 0.0);
-
-    /// set first row by a vector
-    M1.set_row(0, Vector4D(1.1, 2.2, 3.3, 4.4));
-
-    /// set second column by a vector
-    M1.set_column(1, Vector3D(5.5, 5.5, 5.5));
-
-    /// define a 3 by 3 matrix (and all elements initialized to 0.0)
-    Matrix33 B;
-
-    /// define and initialize a 3 by 3 matrix
-    Matrix33 T(1.1, 2.2, 3.3,
-               0, 2.2, 3.3,
-               0, 0, 1);
-
-    /// define and initialize a 3 by 4 matrix
-    Matrix34 C(1.1, 2.2, 3.3, 0,
-               0, 2.2, 3.3, 1,
-               0, 0, 1, 1);
-
-    /// define a 15 by 9 matrix (and all elements initialized to 0.0)
-    Matrix W(15, 9, 0.0);
-    /// set the first row by a 9-dimensional vector
-    W.set_row(0, {0, 1, 2, 3, 4, 5, 6, 7, 8}); // {....} is equivalent to a std::vector<double>
-
-    /// get the number of rows.
-    int num_rows1 = W.rows();
-
-    /// get the number of columns.
-    int num_cols = W.cols();
-
-    /// get the the element at row 1 and column 2
-    double value = W(1, 2);
-
-    /// get the last column of a matrix
-    // Vector last_column = W.get_column(W.cols() - 1);
-
-    /// define a 3 by 3 identity matrix
-    Matrix33 I = Matrix::identity(3, 3, 1.0);
-
-    /// matrix-vector product
-    Vector3D v = M1 * Vector4D(1, 2, 3, 4); // M is 3 by 4
-
-    // Matrix U(m, m, 0.0);   // initialized with 0s
-    // Matrix S(m, n, 0.0);   // initialized with 0s
-    // Matrix V(n, n, 0.0);   // initialized with 0s
-
-    // Compute the SVD decomposition of A
-    // svd_decompose(A, U, S, V);
-
-    // Now let's check if the SVD result is correct
-
-    // // Check 1: U is orthogonal, so U * U^T must be identity
-    // std::cout << "U*U^T: \n" << U * transpose(U) << std::endl;
-    //
-    // // Check 2: V is orthogonal, so V * V^T must be identity
-    // std::cout << "V*V^T: \n" << V * transpose(V) << std::endl;
-    //
-    // // Check 3: S must be a diagonal matrix
-    // std::cout << "S: \n" << S << std::endl;
-    //
-    // // Check 4: according to the definition, A = U * S * V^T
-    // std::cout << "M - U * S * V^T: \n" << A - U * S * transpose(V) << std::endl;
-
-    // Compute the inverse of a matrix
-    Matrix invT;
-    inverse(T, invT);
-    // Let's check if the inverse is correct
-    std::cout << "T * invT: \n" << T * invT << std::endl;
-
-    // TODO: the above code just demonstrates some useful data structures and APIs. Please remove all above code in your
-    //       final submission.
-
-    //--------------------------------------------------------------------------------------------------------------
-    // implementation starts ...
-
     std::cout << "\n[Liangliang]:\n"
             "\tThis function takes two arrays as input parameters:\n"
             "\t\t- points_3d: An array of 3D points representing the scene\n"
@@ -200,7 +76,7 @@ bool Calibration::calibration(
             "\t\t- t: a 3D vector encoding camera location.\n"
             "\tIMPORTANT: don't forget to write your recovered parameters to the above variables." << std::endl;
 
-    // check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
+    // ----------------------- check if input is valid (e.g., number of correspondences >= 6, sizes of 2D/3D points must match)
 
     int num_3d_points = points_3d.size();
     int num_2d_points = points_2d.size();
@@ -209,7 +85,7 @@ bool Calibration::calibration(
         return false;
     }
 
-    // construct the P matrix (so P * m = 0).
+    // ----------------------- construct the P matrix (so P * m = 0).
     int num_rows = num_3d_points * 2;
 
     Matrix P(num_rows, 12, 0.0);
@@ -226,9 +102,7 @@ bool Calibration::calibration(
     }
     std::cout << "P: \n" << P << std::endl;
 
-    // TODO: solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
-    //   Optional: you can check if your M is correct by applying M on the 3D points. If correct, the projected point
-    //             should be very close to your input images points.
+    // ----------------------- solve for M (the whole projection matrix, i.e., M = K * [R, t]) using SVD decomposition.
 
     const int m = 2 * num_3d_points, n = 12;
 
@@ -289,15 +163,19 @@ bool Calibration::calibration(
 
     std::cout << "M: \n" << M << std::endl;
 
-    // // cross-check points
+    // ---------------------- Optional: check if your M is correct by applying M on the 3D points. If correct, the projected point
+    // ----------------------- should be very close to your input images points.
+    std::cout << "Verifying the intermediate results: applying M on the 3D points" << std::endl;
 
-    for (const Vector3D &points: points_3d) {
-        std::cout << "\nPoint: \n" << points << std::endl;
+    for (size_t i = 0; i < points_3d.size(); ++i) {
+        const Vector3D &point = points_3d[i];
+        const double x_input = points_2d[i][0];  // Access corresponding 2D point x
+        const double y_input = points_2d[i][1];  // Access corresponding 2D point y
 
         Matrix point_test_matrix(4, 1, 1.0);
 
         for (int i = 0; i < 3; i++) {
-            point_test_matrix(i, 0) = points[i];
+            point_test_matrix(i, 0) = point[i];
         }
 
         Matrix s_pi = M * point_test_matrix;
@@ -309,11 +187,13 @@ bool Calibration::calibration(
         double x = su / sc;
         double y = sv / sc;
 
-        std::cout << "Computed x: " << x << std::endl;
-        std::cout << "Computed y: " << y << std::endl;
+
+        std::cout << "Input 2D Point: (" << x_input << ", " << y_input << ")" << std::endl;
+        std::cout << "Computed 2D Point: (" << x << ", " << y << ")\n" << std::endl;
+
     }
 
-    // extract intrinsic parameters from M.
+    // ---------------------- extract intrinsic parameters from M.
 
     // calculate a1 using vector3d
     double a1_1 = m_matrix(0, 0);
@@ -351,7 +231,6 @@ bool Calibration::calibration(
     std::cout << "norm_cross_a1_a3: " << norm_cross_a1_a3 << std::endl;
     std::cout << "norm_cross_a2_a3: " << norm_cross_a2_a3 << std::endl;
 
-    // TODO solve this equation
     double cos_theta = -1 * dot(cross_a1_a3, cross_a2_a3) / (norm_cross_a1_a3 * norm_cross_a2_a3);
 
     // Clamp cos_theta to the range [-1, 1]
@@ -367,7 +246,6 @@ bool Calibration::calibration(
 
     // calculate alpha= rho^2 * ||a1*a3|| * sin(ø)
 
-    // TODO deal with the signal of sin
     // double sin_theta = sqrt(std::max(0, 1 - cos_theta * cos_theta)); // Ensure numerical stability
     double sin_theta = sqrt(1 - cos_theta * cos_theta);
     std::cout << "sin_theta: " << sin_theta << std::endl;
@@ -377,7 +255,6 @@ bool Calibration::calibration(
 
 
     // calculate beta = rho^2 * ||a2*a3|| * sin(ø)
-    // TODO deal if the signal of sin?
 
     double beta = (rho * rho) * norm_cross_a2_a3 * sin_theta;
     std::cout << "beta: " << beta << std::endl;
@@ -387,7 +264,6 @@ bool Calibration::calibration(
     std::cout << "fx: " << fx << std::endl;
 
     // calculate fy = beta / sin(ø)
-    // TODO deal if the signal of sin?
 
     fy = beta / sin_theta;
     std::cout << "fy: " << fy << std::endl;
@@ -397,21 +273,9 @@ bool Calibration::calibration(
 
     std::cout << "s: " << s << std::endl;
 
-    // TODO: extract extrinsic parameters from M.
-    // calculate r1 = (a2*a3)/||a2*a3||
+    // ----------------------  extract extrinsic parameters from M.
 
-    Vector3D r1 = cross_a2_a3 / norm_cross_a2_a3;
-    std::cout << "r1: " << r1 << std::endl;
-
-    // calculate r3= rho * a3
-    Vector3D r3 = rho * a3;
-    std::cout << "r3: " << r3 << std::endl;
-
-    // calculate r2 = r3 x r1
-    Vector3D r2 = cross(r3, r1);
-    std::cout << "r2: " << r2 << std::endl;
-
-    //calculate t= rho*K-1*b
+    // Extract b
     double b1 = m_matrix(0, 3);
     double b2 = m_matrix(1, 3);
     double b3 = m_matrix(2, 3);
@@ -423,10 +287,27 @@ bool Calibration::calibration(
                0, 0, 1);
     std::cout << "K: " << K << std::endl;
 
-    // TODO: Handle the signal of rho
-
+    //calculate t= rho*K-1*b
     t = rho * inverse(K) * b;
     std::cout << "t: " << t << std::endl;
+
+    // if t(2) < 0, then rho = -rho
+    if (t.z() < 0) {
+        rho = -rho;
+        t = rho * inverse(K) * b;
+    }
+
+    // calculate r1 = (a2*a3)/||a2*a3||
+    Vector3D r1 = cross_a2_a3 / norm_cross_a2_a3;
+    std::cout << "r1: " << r1 << std::endl;
+
+    // calculate r3= rho * a3
+    Vector3D r3 = rho * a3;
+    std::cout << "r3: " << r3 << std::endl;
+
+    // calculate r2 = r3 x r1
+    Vector3D r2 = cross(r3, r1);
+    std::cout << "r2: " << r2 << std::endl;
 
     //calculate R
     R = Matrix33(r1.x(), r1.y(), r1.z(),
@@ -439,30 +320,33 @@ bool Calibration::calibration(
     // std::cout << "R inverse: " << inverse(R) << std::endl;
     // std::cout << "R . R transpose: " << R.transpose() * R << std::endl;
 
-    //test if these values are correct by feeding it a 3D point and checking if the 2D point is correct p=K[R t]P
-    Vector3D test_point = Vector3D(0, 10, 7);
+    // ----------------------Optional: test if these values are correct by feeding it a 3D point and checking if the 2D point is correct p=K[R t]P
+    std::cout << "Verifying the intermediate results: applying K[R t] on the 3D points" << std::endl;
 
     Matrix34 Rt_test(R(0, 0), R(0, 1), R(0, 2), t.x(),
-                     R(1, 0), R(1, 1), R(1, 2), t.y(),
-                     R(2, 0), R(2, 1), R(2, 2), t.z());
-
-    Vector3D s_pi2 = (K * Rt_test) * Vector4D(test_point.x(), test_point.y(), test_point.z(), 1);
-
-    double su2 = s_pi2.x();
-    double sv2 = s_pi2.y();
-    double sc2 = s_pi2.z();
-
-    double x = su2 / sc2;
-    double y = sv2 / sc2;
+             R(1, 0), R(1, 1), R(1, 2), t.y(),
+             R(2, 0), R(2, 1), R(2, 2), t.z());
 
 
-    std::cout << "x,y: " << x << ", " << y <<  std::endl;
+    for (size_t i = 0; i < points_3d.size(); ++i) {
+        const Vector3D &test_point = points_3d[i];
+        const double x_input = points_2d[i][0];  // Access corresponding 2D point x
+        const double y_input = points_2d[i][1];  // Access corresponding 2D point y
 
-    // TODO: make sure the recovered parameters are passed to the corresponding variables (fx, fy, cx, cy, s, R, and t)
+        Vector3D s_pi2 = (K * Rt_test) * Vector4D(test_point.x(), test_point.y(), test_point.z(), 1);
 
 
-    std::cout << "\n\tTODO: After you implement this function, please return 'true' - this will trigger the viewer to\n"
-            "\t\tupdate the rendering using your recovered camera parameters. This can help you to visually check\n"
-            "\t\tif your calibration is successful or not.\n\n" << std::flush;
+        double su2 = s_pi2.x();
+        double sv2 = s_pi2.y();
+        double sc2 = s_pi2.z();
+
+        double x_rt = su2 / sc2;
+        double y_rt = sv2 / sc2;
+
+        std::cout << "Input 2D Point: " << x_input << ", " << y_input <<  std::endl;
+        std::cout << "Computed 2D Point: " << x_rt << ", " << y_rt <<  std::endl;
+    }
+
     return true;
 }
+                                                                                                                                               
