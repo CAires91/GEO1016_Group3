@@ -275,7 +275,7 @@ bool Calibration::calibration(
 
     // ----------------------  extract extrinsic parameters from M.
 
-    // Extract b
+    // extract b
     double b1 = m_matrix(0, 3);
     double b2 = m_matrix(1, 3);
     double b3 = m_matrix(2, 3);
@@ -287,7 +287,7 @@ bool Calibration::calibration(
                0, 0, 1);
     std::cout << "K: " << K << std::endl;
 
-    //calculate t= rho*K-1*b
+    // calculate t= rho*K-1*b
     t = rho * inverse(K) * b;
     std::cout << "t: " << t << std::endl;
 
@@ -309,16 +309,12 @@ bool Calibration::calibration(
     Vector3D r2 = cross(r3, r1);
     std::cout << "r2: " << r2 << std::endl;
 
-    //calculate R
+    // calculate R
     R = Matrix33(r1.x(), r1.y(), r1.z(),
                  r2.x(), r2.y(), r2.z(),
                  r3.x(), r3.y(), r3.z());
     std::cout << "R: " << R << std::endl;
 
-    // std::cout << "det(R): " << determinant(R) << std::endl;
-    // std::cout << "R tranpose: " << R.transpose() << std::endl;
-    // std::cout << "R inverse: " << inverse(R) << std::endl;
-    // std::cout << "R . R transpose: " << R.transpose() * R << std::endl;
 
     // ----------------------Optional: test if these values are correct by feeding it a 3D point and checking if the 2D point is correct p=K[R t]P
     std::cout << "Verifying the intermediate results: applying K[R t] on the 3D points" << std::endl;
