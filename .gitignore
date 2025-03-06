@@ -1,3 +1,5 @@
 cmake-build-*/
 **/A1_Results/**
-
+.idea/
+*.a
+*.o
