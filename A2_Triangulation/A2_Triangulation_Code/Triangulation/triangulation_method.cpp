@@ -101,8 +101,9 @@ void normalization(
 
     for (const auto& p : points) {
         Vector3D p_hom = p.homogeneous();
-        Vector2D transformed_point = T * p_hom;
-        points_q.push_back(transformed_point);
+        Vector3D transformed_point = T * p_hom;
+        Vector2D transformed_point2 = transformed_point.cartesian();
+        points_q.push_back(transformed_point2);
     }
 }
 
@@ -203,11 +204,41 @@ int countPointsInFront(const std::vector<Vector2D>& points_0,
     return count;
 }
 
-/**
- * TODO: Finish this function for reconstructing 3D geometry from corresponding image points.
- * @return True on success, otherwise false. On success, the reconstructed 3D points must be written to 'points_3d'
- *      and the recovered relative pose must be written to R and t.
- */
+Vector2D project3DPoint(const Vector3D& P, const Matrix33& K, const Matrix34& M) {
+    Vector4D P_hom = P.homogeneous();
+
+    // Apply the projection matrix
+    Vector3D projected_img = M * P_hom;
+
+    // Convert to 2D Euclidean coordinates
+    return Vector2D(projected_img.x() / projected_img.z(), projected_img.y() / projected_img.z());
+}
+
+
+double computeReprojectionError(const std::vector<Vector2D>& points_0,
+                                 const std::vector<Vector2D>& points_1,
+                                 const std::vector<Vector3D>& points_3d,
+                                 const Matrix& K,
+                                 const Matrix34& M0,
+                                 const Matrix34& M) {
+    double total_error = 0.0;
+    size_t num_points = points_3d.size();
+
+    for (size_t i = 0; i < num_points; ++i) {
+        // Project 3D points back into image space
+        Vector3D P = points_3d[i];
+        Vector2D reprojected_0 = project3DPoint(P, K, M0);
+        Vector2D reprojected_1 = project3DPoint(P, K, M);
+
+        // Calculate error for both views
+        total_error += (reprojected_0 - points_0[i]).norm() + (reprojected_1 - points_1[i]).norm();
+    }
+
+    // Return average reprojection error
+    return total_error / (2*num_points);
+}
+
+
 bool Triangulation::triangulation(
         double fx, double fy,     /// input: the focal lengths (same for both cameras)
         double cx, double cy,     /// input: the principal point (same for both cameras)
@@ -219,12 +250,6 @@ bool Triangulation::triangulation(
         Vector3D &t    /// output: 3D vector, which is the recovered translation of the 2nd camera
 ) const
 {
-    /// NOTE: there might be multiple workflows for reconstructing 3D geometry from corresponding image points.
-    ///       This assignment uses the commonly used one explained in our lecture.
-    ///       It is advised to define a function for the sub-tasks. This way you have a clean and well-structured
-    ///       implementation, which also makes testing and debugging easier. You can put your other functions above
-    ///       'triangulation()'.
-
 
     std::cout << "[Liangliang]:\n"
                  "\tSimilar to the first assignment, basic linear algebra data structures and functions are provided in\n"
@@ -241,78 +266,17 @@ bool Triangulation::triangulation(
                  "\t    - remove ALL unrelated test code, debugging code, and comments.\n"
                  "\t    - ensure that your code compiles and can reproduce your results WITHOUT ANY modification.\n\n" << std::flush;
 
-    /// Below are a few examples showing some useful data structures and APIs.
-
-    // /// define a 2D vector/point
-    // Vector2D b(1.1, 2.2);
-    //
-    // /// define a 3D vector/point
-    // Vector3D a(1.1, 2.2, 3.3);
-    //
-    // /// get the Cartesian coordinates of a (a is treated as Homogeneous coordinates)
-    // Vector2D p = a.cartesian();
-    //
-    // /// get the Homogeneous coordinates of p
-    // Vector3D q = p.homogeneous();
-    //
-    // /// define a 3 by 3 matrix (and all elements initialized to 0.0)
-    // Matrix33 A;
-    //
-    // /// define and initialize a 3 by 3 matrix
-    // Matrix33 T(1.1, 2.2, 3.3,
-    //            0, 2.2, 3.3,
-    //            0, 0, 1);
-    //
-    // /// define and initialize a 3 by 4 matrix
-    // Matrix34 M(1.1, 2.2, 3.3, 0,
-    //            0, 2.2, 3.3, 1,
-    //            0, 0, 1, 1);
-    //
-    // /// set first row by a vector
-    // M.set_row(0, Vector4D(1.1, 2.2, 3.3, 4.4));
-    //
-    // /// set second column by a vector
-    // M.set_column(1, Vector3D(5.5, 5.5, 5.5));
-    //
-    // /// define a 15 by 9 matrix (and all elements initialized to 0.0)
-    // Matrix W(15, 9, 0.0);
-    // /// set the first row by a 9-dimensional vector
-    // W.set_row(0, {0, 1, 2, 3, 4, 5, 6, 7, 8}); // {....} is equivalent to a std::vector<double>
-    //
-    // /// get the number of rows.
-    // int num_rows = W.rows();
-    //
-    // /// get the number of columns.
-    // int num_cols = W.cols();
-    //
-    // /// get the the element at row 1 and column 2
-    // double value = W(1, 2);
-    //
-    // /// get the last column of a matrix
-    // Vector last_column = W.get_column(W.cols() - 1);
-    //
-    // /// define a 3 by 3 identity matrix
-    // Matrix33 I = Matrix::identity(3, 3, 1.0);
-    //
-    // /// matrix-vector product
-    // Vector3D v = M * Vector4D(1, 2, 3, 4); // M is 3 by 4
-
-    ///For more functions of Matrix and Vector, please refer to 'matrix.h' and 'vector.h'
-
-    // TODO: delete all above example code in your final submission
 
 
-    //--------------------------------------------------------------------------------------------------------------
-    // implementation starts ...
-
-    // TODO: check if the input is valid (always good because you never known how others will call your function).
+    // check if the input is valid (always good because you never known how others will call your function).
     int num_points0 = points_0.size();
     int num_points1 = points_1.size();
 
     if (num_points1 < 8 || num_points0 < 8 || num_points1 != num_points0) {
+        std::cerr << "Error: Invalid number of points (less than 8 or mismatched points between images).\n";
         return false;
     }
-    // TODO: Estimate relative pose of two views. This can be subdivided into
+    // Estimate relative pose of two views. This can be subdivided into
 
     //      - Normalize;
 
@@ -329,6 +293,7 @@ bool Triangulation::triangulation(
     std::cout << "T_img1: " << T_img1 << std::endl;
     std::cout << "T_img2: "  << T_img2 << std::endl;
 
+    std::cout << "points_q_img1: " << points_q_img1[0] << std::endl;
 
     //      - estimate the fundamental matrix F;
 
@@ -499,34 +464,6 @@ bool Triangulation::triangulation(
     Matrix M2 = K * Rt2;
     Matrix M3 = K * Rt3;
     Matrix M4 = K * Rt4;
-    //
-    // std::vector<Vector3D> points_3d1;
-    // int count1 = countPointsInFront(points_0, points_1, M1, R_var1, t_var1, points_3d1, K);
-    // std::cout << "count1:\n" << count1 << std::endl;
-    //
-    //  R = R_var1;
-    //  t = t_var1;
-    //  points_3d = points_3d1;
-    // Rotation and translation working, points displaying weirdly, 160 points
-    //
-    // std::vector<Vector3D> points_3d2;
-    // int count2 = countPointsInFront(points_0, points_1, M2, R_var1, t_var2, points_3d2, K);
-    // std::cout << "count2:\n" << count2 << std::endl;
-    //
-    // R = R_var1;
-    // t = t_var2;
-    // points_3d = points_3d2;
-    // // // Rotation and translation not working, no points displayed
-
-    // std::vector<Vector3D> points_3d3;
-    // int count3 = countPointsInFront(points_0, points_1, M3, R_var2, t_var1, points_3d3, K);
-    // std::cout << "count3:\n" << count3 << std::endl;
-    //
-    // R = R_var2;
-    // t = t_var1;
-    // points_3d = points_3d3;
-    // // Rotation and translation correct,  points displaying weirdly, 160 points
-
 
     std::vector<Vector3D> points_3d4;
     int count4 = countPointsInFront(points_0, points_1, M4, R_var2, t_var2, points_3d4, K);
@@ -535,7 +472,6 @@ bool Triangulation::triangulation(
     R = R_var2;
     t = t_var2;
     points_3d = points_3d4;
-    // Rotation and translation not working, no points displayed
 
 
     // Define R and t variants
@@ -554,7 +490,7 @@ bool Triangulation::triangulation(
         std::vector<Vector3D> temp_points_3d;
         int count = countPointsInFront(points_0, points_1, M_matrices[i], R_variants[i], t_variants[i], temp_points_3d, K);
 
-        std::cout << "For M" << i + 1 << " ---------------------------------------------------------------------------------------------------------> Points in front: " << count << std::endl;
+        std::cout << "For M" << i + 1 << " -> Points in front: " << count << std::endl;
 
         if (count > max_count) {
             max_count = count;
@@ -580,13 +516,18 @@ bool Triangulation::triangulation(
     t = best_t;
     points_3d = best_points_3d;
 
-    // TODO: Reconstruct 3D points. The main task is
-    //      - triangulate a pair of image points (i.e., compute the 3D coordinates for each corresponding point pair)
+    // Identity R | t, t = 0,0,0
+    Matrix34 Rt0(1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0);
 
-    // TODO: Don't forget to
-    //          - write your recovered 3D points into 'points_3d' (sox
-    //          - write the recovered relative pose into R and t (the view will be updated as seen from the 2nd camera,
-    //            which can help you check if R and t are correct).
+    //M0 is the projection matrix for the first camera
+    Matrix34 M0 = K * Rt0;
+
+
+    std::cout << "Reprojection Error:\n" << computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M) << std::endl;
+
+
     //       You must return either 'true' or 'false' to indicate whether the triangulation was successful (so the
     //       viewer will be notified to visualize the 3D points and update the view).
     //       There are a few cases you should return 'false' instead, for example:
