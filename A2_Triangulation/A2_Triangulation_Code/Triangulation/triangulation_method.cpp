@@ -29,15 +29,14 @@
 
 using namespace easy3d;
 
-void centroid(
+void normalization(
     const std::vector<Vector2D> &points,
-    Vector2D &centroid
+    std::vector<Vector2D> &points_q, /// output: points transformed
+    Matrix33 &T /// output: 3 by 3 transformation matrix
     ) {
 
     // calculate size of points
     const int num_points = points.size();
-
-    Vector2D centroid_img;
 
     double sum_x = 0.0;
     double sum_y = 0.0;
@@ -48,21 +47,23 @@ void centroid(
         sum_x += points[i][0];
         sum_y += points[i][1];
     }
-    centroid = Vector2D(sum_x / num_points, sum_y / num_points);
-}
+    Vector2D centroid_points;
+    centroid_points = Vector2D(sum_x / num_points, sum_y / num_points);
 
-void scale_factor(
-    const std::vector<Vector2D> &points, /// input: points
-    Vector2D centroid, /// input: points
-    double &scale /// output: scale factor
-    ) {
+    // translate by the centroid
+    double tx = centroid_points[0];
+    double ty = centroid_points[1];
+
+    // scale
+    double scale = 1;
+
 
     double sum_distance(0.0);
 
     // Accumulate Euclidean distances
     for (const auto &point : points) {
-        double dx = point[0] - centroid[0];
-        double dy = point[1] - centroid[1];
+        double dx = point[0] - centroid_points[0];
+        double dy = point[1] - centroid_points[1];
         sum_distance += sqrt(dx * dx  + dy * dy); // Accumulate Euclidean distances
     }
 
@@ -71,25 +72,6 @@ void scale_factor(
 
     // Calculate the scale factor to normalize the mean distance to sqrt(2)
     scale = sqrt(2)/mean_distance;
-}
-
-void normalization(
-    const std::vector<Vector2D> &points,
-    std::vector<Vector2D> &points_q, /// output: points transformed
-    Matrix33 &T /// output: 3 by 3 transformation matrix
-    ) {
-
-    Vector2D centroid_points;
-    centroid(points,centroid_points);
-
-
-    // translate by the centroid
-    double tx = centroid_points[0];
-    double ty = centroid_points[1];
-
-    // scale
-    double scale = 1;
-    scale_factor(points,centroid_points, scale);
 
     // T
     T = Matrix33(scale, 0, -scale * tx,
@@ -104,6 +86,11 @@ void normalization(
         Vector3D transformed_point = T * p_hom;
         Vector2D transformed_point2 = transformed_point.cartesian();
         points_q.push_back(transformed_point2);
+    }
+
+    // Check if the number of points is the same
+    if (points_q.size() != points.size()) {
+        throw std::runtime_error("Normalization failed: mismatch in point count.");
     }
 }
 
@@ -164,9 +151,6 @@ Vector3D reconstruct3D(const Matrix34& M, //M is the projection matrix for the s
     Vector4D P_4D = V.get_column(V.cols() - 1);
 
     Vector3D P = P_4D.cartesian();
-
-
-
     return P;
 
 }
@@ -214,6 +198,7 @@ Vector2D project3DPoint(const Vector3D& P, const Matrix33& K, const Matrix34& M)
     return Vector2D(projected_img.x() / projected_img.z(), projected_img.y() / projected_img.z());
 }
 
+
 std::pair<double, double> computeReprojectionError(const std::vector<Vector2D>& points_0,
                                                     const std::vector<Vector2D>& points_1,
                                                     const std::vector<Vector3D>& points_3d,
@@ -244,6 +229,7 @@ std::pair<double, double> computeReprojectionError(const std::vector<Vector2D>& 
 
     return {rmse, total_squared_error};
 }
+
 
 
 bool Triangulation::triangulation(
@@ -283,9 +269,10 @@ bool Triangulation::triangulation(
         std::cerr << "Error: Invalid number of points (less than 8 or mismatched points between images).\n";
         return false;
     }
-    // Estimate relative pose of two views. This can be subdivided into
 
-    //      - Normalize;
+    // Step 1: Estimate relative pose of two views. This can be subdivided into
+
+    //      - step 1.1: Normalize the input points.
 
     std::vector<Vector2D> points_q_img1;
     std::vector<Vector2D> points_q_img2;
@@ -296,41 +283,25 @@ bool Triangulation::triangulation(
     normalization(points_0, points_q_img1, T_img1);
     normalization(points_1, points_q_img2, T_img2);
 
-
-    std::cout << "T_img1: " << T_img1 << std::endl;
-    std::cout << "T_img2: "  << T_img2 << std::endl;
-
-    std::cout << "points_q_img1: " << points_q_img1[0] << std::endl;
-
-    //      - estimate the fundamental matrix F;
+    //      step 1.2: estimate the fundamental matrix F;
 
     //  Construct W
     int num_rows_img1 = points_0.size();
-
-
     Matrix W(num_rows_img1, 9, 0.0);
     construct_W_matrix(points_q_img1, points_q_img2, W);
 
     // SVD for W
-
     const int m = num_rows_img1, n = 9;
-
-    Matrix U(m, m, 0.0); // initialized with 0s
-    Matrix S(m, n, 0.0); // initialized with 0s
-    Matrix V(n, n, 0.0); // initialized with 0s
+    Matrix U(m, m, 0.0);
+    Matrix S(m, n, 0.0);
+    Matrix V(n, n, 0.0);
 
     // compute the SVD decomposition of W
     svd_decompose(W, U, S, V);
 
-    std::cout << "W matrix: " << W << std::endl;
-
-    std::cout << "V matrix: " << V << std::endl;
-
     /// get the last column of the V matrix
 
     Vector f = V.get_column(V.cols() - 1);
-
-    std::cout << "Last column of V: " << f << std::endl;
 
     Matrix33 F(0.0);
 
@@ -341,41 +312,31 @@ bool Triangulation::triangulation(
         }
     }
 
-    std::cout << "F matrix: " << F << std::endl;
-
     const int m_2 = 3, n_2 = 3;
 
-    Matrix U_2(m_2, m_2, 0.0); // initialized with 0s
-    Matrix S_2(m_2, n_2, 0.0); // initialized with 0s
-    Matrix V_2(n_2, n_2, 0.0); // initialized with 0s
+    Matrix U_2(m_2, m_2, 0.0);
+    Matrix S_2(m_2, n_2, 0.0);
+    Matrix V_2(n_2, n_2, 0.0);
 
     // SVD for ^ F
     svd_decompose(F, U_2, S_2, V_2);
 
-    double d_3 = S_2(2,2);
-
-    std::cout << "d_3: "<< d_3 << std::endl;
-
-    std::cout << "F: " << F << std::endl;
-    std::cout << "S_2: " << S_2 << std::endl;
-
-    // enforce d_3 = 0
-
     S_2(2,2) = 0;
 
-    std::cout << "S_2: " << S_2 << std::endl;
 
     Matrix33 Fq;
 
     Fq = U_2 * S_2 * transpose(V_2);
 
-    std::cout << "Fq: " << Fq << std::endl;
-
     Matrix33 F_denormalized;
 
     F_denormalized = transpose(T_img2) * Fq * T_img1;
 
-    std::cout << "F_denormalized: " << F_denormalized << std::endl;
+    double det_F = determinant(F_denormalized);
+    if (std::abs(det_F) > 1e-6) {
+        std::cerr << "Warning: Fundamental matrix determinant is not close to zero. Possible issue with computation.\n";
+        std::cout<< "Determinant of F: " << det_F << std::endl;
+    }
 
 
     Matrix33 K(fx, s, cx,
@@ -407,47 +368,18 @@ bool Triangulation::triangulation(
     Matrix V_3(n_3, n_3, 0.0); // initialized with 0s
 
     svd_decompose(E, U_3, S_3, V_3); //@attention V is returned (instead of V^T)
-
-    std::cout << "U_3: " << U_3 << std::endl;
-
     Vector u_3 = U_3.get_column(U_3.cols() - 1);
-
-    std::cout << "u_3: " << u_3 << std::endl;
-
-    // // Verify t
-    //
-    // Matrix t_x = U_3 * Z * transpose(U_3);
-    //
-    // std::cout << "t_x: " << t_x << std::endl;
-    //
-    // Matrix L(3,1, {0, 0, 1});
-    //
-    // // Compute translation candidates
-    // Matrix t_matrix1 = U_3 * L;
-    // Matrix t_matrix2 = -1 * U_3 * L;
-    //
-    // // Convert the matrices to 3D vectors
-    // Vector3D t_var1(t_matrix1(0, 0), t_matrix1(1, 0), t_matrix1(2, 0));
-    // Vector3D t_var2(t_matrix2(0, 0), t_matrix2(1, 0), t_matrix2(2, 0));
-
     Vector3D t_var1 = u_3;
     Vector3D t_var2 = -u_3;
 
-    std::cout << "t_var1: " << t_var1 << std::endl;
-    std::cout << "t_var2: " << t_var2 << std::endl;
 
     // R
 
     Matrix33 R_var1;
-
     R_var1 = determinant(U_3 * W_2 * transpose(V_3)) * U_3 * W_2 * transpose(V_3);
-
     Matrix33 R_var2;
-
     R_var2 = determinant(U_3 * transpose(W_2) * transpose(V_3)) * U_3 * transpose(W_2) * transpose(V_3);
 
-    std::cout << "R_Var1: " << R_var1 << std::endl;
-    std::cout << "R_Var2: " << R_var2 << std::endl;
 
     // Define the four possible Rt combinations
     Matrix34 Rt1(R_var1(0, 0), R_var1(0, 1), R_var1(0, 2), t_var1.x(),
@@ -472,15 +404,6 @@ bool Triangulation::triangulation(
     Matrix M3 = K * Rt3;
     Matrix M4 = K * Rt4;
 
-    std::vector<Vector3D> points_3d4;
-    int count4 = countPointsInFront(points_0, points_1, M4, R_var2, t_var2, points_3d4, K);
-    std::cout << "count4:\n" << count4 << std::endl;
-
-    R = R_var2;
-    t = t_var2;
-    points_3d = points_3d4;
-
-
     // Define R and t variants
     std::vector<Matrix33> R_variants = {R_var1, R_var1, R_var2, R_var2};
     std::vector<Vector3D> t_variants = {t_var1, t_var2, t_var1, t_var2};
@@ -497,27 +420,26 @@ bool Triangulation::triangulation(
         std::vector<Vector3D> temp_points_3d;
         int count = countPointsInFront(points_0, points_1, M_matrices[i], R_variants[i], t_variants[i], temp_points_3d, K);
 
-        std::cout << "For M" << i + 1 << " -> Points in front: " << count << std::endl;
-
         if (count > max_count) {
             max_count = count;
             best_R = R_variants[i];
             best_t = t_variants[i];
             best_M = M_matrices[i];
             best_points_3d = temp_points_3d;
-            std::cout << "best_points_3d:\n" << best_points_3d[0] << std::endl;
 
         }
     }
+    if (max_count < points_0.size()/2) {
+        std::cerr << "Warning: Less than half of the points are in front of both cameras. Possible issue with reconstruction.\n";
+        std::cout<< "Number of points in front: " << max_count << std::endl;
+    }
 
-    std::cout << "best_points_3d outside:\n" << best_points_3d[0] << std::endl;
-
-
-    // Output the best M, R, and t
-    std::cout << "Best M:\n" << best_M << std::endl;
-    std::cout << "Best R:\n" << best_R << std::endl;
-    std::cout << "Best t:\n" << best_t << std::endl;
-
+    //check if the determinant of the rotation matrix is 1
+    double detR = determinant(best_R);
+    if (std::abs(detR - 1.0) > 1e-6) {
+        std::cerr << "Warning: Rotation matrix determinant is not 1. Possible issue with decomposition.\n";
+        std::cout<< "Determinant of R: " << detR << std::endl;
+    }
 
     R = best_R;
     t = best_t;
@@ -531,7 +453,6 @@ bool Triangulation::triangulation(
     //M0 is the projection matrix for the first camera
     Matrix34 M0 = K * Rt0;
 
-
     // Compute RMSE and total squared error
     std::pair<double, double> result = computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M);
 
@@ -539,5 +460,5 @@ bool Triangulation::triangulation(
     std::cout << "Reprojection RMSE: " << result.first << std::endl;
     std::cout << "Total Squared Error: " << result.second << std::endl;
 
-    return true;
+    return points_3d.size() > 0;
 }
