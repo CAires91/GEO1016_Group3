@@ -214,14 +214,13 @@ Vector2D project3DPoint(const Vector3D& P, const Matrix33& K, const Matrix34& M)
     return Vector2D(projected_img.x() / projected_img.z(), projected_img.y() / projected_img.z());
 }
 
-
-double computeReprojectionError(const std::vector<Vector2D>& points_0,
-                                 const std::vector<Vector2D>& points_1,
-                                 const std::vector<Vector3D>& points_3d,
-                                 const Matrix& K,
-                                 const Matrix34& M0,
-                                 const Matrix34& M) {
-    double total_error = 0.0;
+std::pair<double, double> computeReprojectionError(const std::vector<Vector2D>& points_0,
+                                                    const std::vector<Vector2D>& points_1,
+                                                    const std::vector<Vector3D>& points_3d,
+                                                    const Matrix& K,
+                                                    const Matrix34& M0,
+                                                    const Matrix34& M) {
+    double total_squared_error = 0.0;
     size_t num_points = points_3d.size();
 
     for (size_t i = 0; i < num_points; ++i) {
@@ -230,12 +229,20 @@ double computeReprojectionError(const std::vector<Vector2D>& points_0,
         Vector2D reprojected_0 = project3DPoint(P, K, M0);
         Vector2D reprojected_1 = project3DPoint(P, K, M);
 
-        // Calculate error for both views
-        total_error += (reprojected_0 - points_0[i]).norm() + (reprojected_1 - points_1[i]).norm();
+        // Compute squared error for both views using direct multiplication
+        Vector2D diff_0 = reprojected_0 - points_0[i];
+        Vector2D diff_1 = reprojected_1 - points_1[i];
+
+        double error_0 = diff_0[0] * diff_0[0] + diff_0[1] * diff_0[1];
+        double error_1 = diff_1[0] * diff_1[0] + diff_1[1] * diff_1[1];
+
+        total_squared_error += error_0 + error_1;
     }
 
-    // Return average reprojection error
-    return total_error / (2*num_points);
+    // Compute RMSE
+    double rmse = std::sqrt(total_squared_error / (2 * num_points));
+
+    return {rmse, total_squared_error};
 }
 
 
@@ -525,15 +532,12 @@ bool Triangulation::triangulation(
     Matrix34 M0 = K * Rt0;
 
 
-    std::cout << "Reprojection Error:\n" << computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M) << std::endl;
+    // Compute RMSE and total squared error
+    std::pair<double, double> result = computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M);
 
-
-    //       You must return either 'true' or 'false' to indicate whether the triangulation was successful (so the
-    //       viewer will be notified to visualize the 3D points and update the view).
-    //       There are a few cases you should return 'false' instead, for example:
-    //          - function not implemented yet;
-    //          - input not valid (e.g., not enough points, point numbers don't match);
-    //          - encountered failure in any step.
+    // Print results
+    std::cout << "Reprojection RMSE: " << result.first << std::endl;
+    std::cout << "Total Squared Error: " << result.second << std::endl;
 
     return true;
 }
