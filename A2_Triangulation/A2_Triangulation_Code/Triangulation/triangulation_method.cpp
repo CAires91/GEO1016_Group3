@@ -25,6 +25,7 @@
 #include "triangulation.h"
 #include "matrix_algo.h"
 #include <easy3d/optimizer/optimizer_lm.h>
+#include <tuple>
 
 
 using namespace easy3d;
@@ -190,22 +191,28 @@ int countPointsInFront(const std::vector<Vector2D>& points_0,
 
 Vector2D project3DPoint(const Vector3D& P, const Matrix33& K, const Matrix34& M) {
     Vector4D P_hom = P.homogeneous();
+    // std::cout<< "P_hom: " << P_hom << std::endl;
 
     // Apply the projection matrix
     Vector3D projected_img = M * P_hom;
+    // std::cout<< "projected_img: " << projected_img << std::endl;
+    // std::cout<< "original: " << P << std::endl;
 
     // Convert to 2D Euclidean coordinates
-    return Vector2D(projected_img.x() / projected_img.z(), projected_img.y() / projected_img.z());
+    return Vector2D(projected_img.cartesian());
 }
 
 
-std::pair<double, double> computeReprojectionError(const std::vector<Vector2D>& points_0,
+std::tuple<double, double, double, double> computeReprojectionError(const std::vector<Vector2D>& points_0,
                                                     const std::vector<Vector2D>& points_1,
                                                     const std::vector<Vector3D>& points_3d,
                                                     const Matrix& K,
                                                     const Matrix34& M0,
                                                     const Matrix34& M) {
-    double total_squared_error = 0.0;
+    double total_squared_error_0_x = 0.0;
+    double total_squared_error_0_y = 0.0;
+    double total_squared_error_1_x = 0.0;
+    double total_squared_error_1_y = 0.0;
     size_t num_points = points_3d.size();
 
     for (size_t i = 0; i < num_points; ++i) {
@@ -218,16 +225,29 @@ std::pair<double, double> computeReprojectionError(const std::vector<Vector2D>& 
         Vector2D diff_0 = reprojected_0 - points_0[i];
         Vector2D diff_1 = reprojected_1 - points_1[i];
 
-        double error_0 = diff_0[0] * diff_0[0] + diff_0[1] * diff_0[1];
-        double error_1 = diff_1[0] * diff_1[0] + diff_1[1] * diff_1[1];
+        double error_0_x = diff_0[0] * diff_0[0];
+        double error_0_y = diff_0[1] * diff_0[1];
+        double error_1_x = diff_1[0] * diff_1[0];
+        double error_1_y= diff_1[1] * diff_1[1];
 
-        total_squared_error += error_0 + error_1;
+        total_squared_error_0_x += error_0_x;
+        total_squared_error_0_y += error_0_y;
+        total_squared_error_1_x += error_1_x;
+        total_squared_error_1_y += error_1_y;
+
     }
+    // total squared error by using pythagoras sqrt(x^2+y^2)= total error
+    double total_squared_error_0 = total_squared_error_0_x + total_squared_error_0_y;
+    double total_squared_error_1 = total_squared_error_1_x + total_squared_error_1_y;
+
+
 
     // Compute RMSE
-    double rmse = std::sqrt(total_squared_error / (2 * num_points));
 
-    return {rmse, total_squared_error};
+    double rmse_0 = std::sqrt(total_squared_error_0 / ( num_points));
+    double rmse_1 = std::sqrt(total_squared_error_1 / ( num_points));
+
+    return std::make_tuple(rmse_0, total_squared_error_0, rmse_1, total_squared_error_1);
 }
 
 
@@ -269,6 +289,10 @@ bool Triangulation::triangulation(
         std::cerr << "Error: Invalid number of points (less than 8 or mismatched points between images).\n";
         return false;
     }
+    // if (points_0 == points_1) {
+    //     std::cerr << "Error: Input points of both images are identical.\n";
+    //     return false;
+    // }
 
     // Step 1: Estimate relative pose of two views. This can be subdivided into
 
@@ -450,15 +474,24 @@ bool Triangulation::triangulation(
                 0, 1, 0, 0,
                 0, 0, 1, 0);
 
+    Matrix33 K_real(1000, 0, 320,
+                0, 1000, 240,
+                0, 0, 1);
     //M0 is the projection matrix for the first camera
-    Matrix34 M0 = K * Rt0;
+
+    Matrix34 M0 = K_real * Rt0;
+    std::cout<< "M0: " << M0 << std::endl;
 
     // Compute RMSE and total squared error
-    std::pair<double, double> result = computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M);
+    auto [rmse_0, total_error_0, rmse_1, total_error_1] = computeReprojectionError(points_0, points_1, points_3d, K_real, M0, best_M);
 
     // Print results
-    std::cout << "Reprojection RMSE: " << result.first << std::endl;
-    std::cout << "Total Squared Error: " << result.second << std::endl;
+    std::cout << "Reprojection RMSE camera 1: " << rmse_0 << std::endl;
+    std::cout << "Total Squared Error camera 1: " << total_error_0 << std::endl;
+
+    std::cout << "Reprojection RMSE camera 2: " << rmse_1 << std::endl;
+    std::cout << "Total Squared Error camera 2: " << total_error_1 << std::endl;
+
 
     return points_3d.size() > 0;
 }
