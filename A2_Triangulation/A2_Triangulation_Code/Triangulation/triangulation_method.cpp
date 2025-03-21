@@ -204,8 +204,7 @@ bool Triangulation::triangulation(
         std::vector<Vector3D> &points_3d,       /// output: reconstructed 3D points
         Matrix33 &R,   /// output: 3 by 3 matrix, which is the recovered rotation of the 2nd camera
         Vector3D &t    /// output: 3D vector, which is the recovered translation of the 2nd camera
-) const
-{
+) const {
     int num_points0 = points_0.size();
     int num_points1 = points_1.size();
 
@@ -214,169 +213,170 @@ bool Triangulation::triangulation(
         return false;
     }
 
-    if (num_points1 != num_points0){
+    if (num_points1 != num_points0) {
         std::cerr << "Error: Number of points of the input layers are not the same.\n";
         return false;
+    }
 
-    // Step 1: Estimate relative pose of the two views
-        
-    // Normalize the input points.
-    std::vector<Vector2D> points_q_img1;
-    std::vector<Vector2D> points_q_img2;
+        // Step 1: Estimate relative pose of the two views
 
-    Matrix33 T_img1;
-    Matrix33 T_img2;
+        // Normalize the input points.
+        std::vector<Vector2D> points_q_img1;
+        std::vector<Vector2D> points_q_img2;
 
-    normalization(points_0, points_q_img1, T_img1);
-    normalization(points_1, points_q_img2, T_img2);
+        Matrix33 T_img1;
+        Matrix33 T_img2;
 
-    // estimate the fundamental matrix F;
+        normalization(points_0, points_q_img1, T_img1);
+        normalization(points_1, points_q_img2, T_img2);
 
-    //  Construct W
-    int num_rows_img1 = points_0.size();
-    Matrix W(num_rows_img1, 9, 0.0);
-    construct_W_matrix(points_q_img1, points_q_img2, W);
+        // estimate the fundamental matrix F;
 
-    // SVD for W
-    const int m = num_rows_img1, n = 9;
-    Matrix U(m, m, 0.0);
-    Matrix S(m, n, 0.0);
-    Matrix V(n, n, 0.0);
+        //  Construct W
+        int num_rows_img1 = points_0.size();
+        Matrix W(num_rows_img1, 9, 0.0);
+        construct_W_matrix(points_q_img1, points_q_img2, W);
 
-    // compute the SVD decomposition of W
-    svd_decompose(W, U, S, V);
+        // SVD for W
+        const int m = num_rows_img1, n = 9;
+        Matrix U(m, m, 0.0);
+        Matrix S(m, n, 0.0);
+        Matrix V(n, n, 0.0);
 
-    /// get the last column of the V matrix
-    Vector f = V.get_column(V.cols() - 1);
-    Matrix33 F(0.0);
-        
-    int idx = 0;
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            F[i][j] = f[idx++];
+        // compute the SVD decomposition of W
+        svd_decompose(W, U, S, V);
+
+        /// get the last column of the V matrix
+        Vector f = V.get_column(V.cols() - 1);
+        Matrix33 F(0.0);
+
+        int idx = 0;
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                F[i][j] = f[idx++];
+            }
         }
-    }
 
-    // Constraint enforcement
-    const int m_2 = 3, n_2 = 3;
-    Matrix U_2(m_2, m_2, 0.0);
-    Matrix S_2(m_2, n_2, 0.0);
-    Matrix V_2(n_2, n_2, 0.0);
-    svd_decompose(F, U_2, S_2, V_2);
-    S_2(2,2) = 0;
+        // Constraint enforcement
+        const int m_2 = 3, n_2 = 3;
+        Matrix U_2(m_2, m_2, 0.0);
+        Matrix S_2(m_2, n_2, 0.0);
+        Matrix V_2(n_2, n_2, 0.0);
+        svd_decompose(F, U_2, S_2, V_2);
+        S_2(2,2) = 0;
 
-    Matrix33 Fq;
-    Fq = U_2 * S_2 * transpose(V_2);
-        
-    // denormalization
-    Matrix33 F_denormalized;
-    F_denormalized = transpose(T_img2) * Fq * T_img1;
+        Matrix33 Fq;
+        Fq = U_2 * S_2 * transpose(V_2);
 
-    double det_F = determinant(F_denormalized);
-    if (std::abs(det_F) > 1e-6) {
-        std::cerr << "Warning: Fundamental matrix determinant is not close to zero. Possible issue with computation.\n";
-        std::cout<< "Determinant of F: " << det_F << std::endl;
-    }
+        // denormalization
+        Matrix33 F_denormalized;
+        F_denormalized = transpose(T_img2) * Fq * T_img1;
 
-    // compute the essential matrix E;
-    Matrix33 K(fx, s, cx,
-             0, fy, cy,
-             0, 0, 1);     
-    Matrix33 E = transpose(K) * F_denormalized * K;
-
-    // recover rotation R and t.
-    Matrix33 W_2(0.0, -1.0 , 0.0,
-                1.0, 0.0, 0.0,
-                0.0, 0.0, 1.0);
-
-    Matrix33 Z(0.0, 1.0 , 0.0,
-            -1.0, 0.0, 0.0,
-            0.0, 0.0, 0.0);
-
-    // SVD of E
-    constexpr int m_3 = 3, n_3 = 3;
-    Matrix U_3(m_3, m_3, 0.0); 
-    Matrix S_3(m_3, n_3, 0.0); 
-    Matrix V_3(n_3, n_3, 0.0);
-    svd_decompose(E, U_3, S_3, V_3);
-        
-    // get the 2 possible t vectors
-    Vector u_3 = U_3.get_column(U_3.cols() - 1);
-    Vector3D t_var1 = u_3;
-    Vector3D t_var2 = -u_3;
-
-    // Get the 2 possible R matrixes
-    Matrix33 R_var1 = determinant(U_3 * W_2 * transpose(V_3)) * U_3 * W_2 * transpose(V_3);
-    Matrix33 R_var2 = determinant(U_3 * transpose(W_2) * transpose(V_3)) * U_3 * transpose(W_2) * transpose(V_3);
-    
-    // Define the possible Rt combinations
-    std::vector<Matrix34> Rt_combinations(4);
-    std::vector<Matrix33> R_variants = {R_var1, R_var1, R_var2, R_var2};
-    std::vector<Vector3D> t_variants = {t_var1, t_var2, t_var1, t_var2};
-
-    for (int i = 0; i < 4; ++i) {
-        Rt_combinations[i] = Matrix34(
-            R_variants[i](0, 0), R_variants[i](0, 1), R_variants[i](0, 2), t_variants[i].x(),
-            R_variants[i](1, 0), R_variants[i](1, 1), R_variants[i](1, 2), t_variants[i].y(),
-            R_variants[i](2, 0), R_variants[i](2, 1), R_variants[i](2, 2), t_variants[i].z()
-        );
-    }    
-
-    // Compute the projection matrices
-    std::vector<Matrix> M_matrices(4);
-    for (int i = 0; i < 4; ++i) {
-        M_matrices[i] = K * Rt_combinations[i];
-    }
-        
-    // Initialize variables to track the best results
-    int max_count = 0;
-    Matrix33 best_R;
-    Vector3D best_t;
-    Matrix best_M;
-    std::vector<Vector3D> best_points_3d;
-
-    // Iterate through all M matrices and count valid points
-    for (int i = 0; i < 4; i++) {
-        std::vector<Vector3D> temp_points_3d;
-        int count = countPointsInFront(points_0, points_1, M_matrices[i], R_variants[i], t_variants[i], temp_points_3d, K);
-
-        if (count > max_count) {
-            max_count = count;
-            best_R = R_variants[i];
-            best_t = t_variants[i];
-            best_M = M_matrices[i];
-            best_points_3d = temp_points_3d;
-
+        double det_F = determinant(F_denormalized);
+        if (std::abs(det_F) > 1e-6) {
+            std::cerr << "Warning: Fundamental matrix determinant is not close to zero. Possible issue with computation.\n";
+            std::cout<< "Determinant of F: " << det_F << std::endl;
         }
+
+        // compute the essential matrix E;
+        Matrix33 K(fx, s, cx,
+                 0, fy, cy,
+                 0, 0, 1);
+        Matrix33 E = transpose(K) * F_denormalized * K;
+
+        // recover rotation R and t.
+        Matrix33 W_2(0.0, -1.0 , 0.0,
+                    1.0, 0.0, 0.0,
+                    0.0, 0.0, 1.0);
+
+        Matrix33 Z(0.0, 1.0 , 0.0,
+                -1.0, 0.0, 0.0,
+                0.0, 0.0, 0.0);
+
+        // SVD of E
+        constexpr int m_3 = 3, n_3 = 3;
+        Matrix U_3(m_3, m_3, 0.0);
+        Matrix S_3(m_3, n_3, 0.0);
+        Matrix V_3(n_3, n_3, 0.0);
+        svd_decompose(E, U_3, S_3, V_3);
+
+        // get the 2 possible t vectors
+        Vector u_3 = U_3.get_column(U_3.cols() - 1);
+        Vector3D t_var1 = u_3;
+        Vector3D t_var2 = -u_3;
+
+        // Get the 2 possible R matrixes
+        Matrix33 R_var1 = determinant(U_3 * W_2 * transpose(V_3)) * U_3 * W_2 * transpose(V_3);
+        Matrix33 R_var2 = determinant(U_3 * transpose(W_2) * transpose(V_3)) * U_3 * transpose(W_2) * transpose(V_3);
+
+        // Define the possible Rt combinations
+        std::vector<Matrix34> Rt_combinations(4);
+        std::vector<Matrix33> R_variants = {R_var1, R_var1, R_var2, R_var2};
+        std::vector<Vector3D> t_variants = {t_var1, t_var2, t_var1, t_var2};
+
+        for (int i = 0; i < 4; ++i) {
+            Rt_combinations[i] = Matrix34(
+                R_variants[i](0, 0), R_variants[i](0, 1), R_variants[i](0, 2), t_variants[i].x(),
+                R_variants[i](1, 0), R_variants[i](1, 1), R_variants[i](1, 2), t_variants[i].y(),
+                R_variants[i](2, 0), R_variants[i](2, 1), R_variants[i](2, 2), t_variants[i].z()
+            );
+        }
+
+        // Compute the projection matrices
+        std::vector<Matrix> M_matrices(4);
+        for (int i = 0; i < 4; ++i) {
+            M_matrices[i] = K * Rt_combinations[i];
+        }
+
+        // Initialize variables to track the best results
+        int max_count = 0;
+        Matrix33 best_R;
+        Vector3D best_t;
+        Matrix best_M;
+        std::vector<Vector3D> best_points_3d;
+
+        // Iterate through all M matrices and count valid points
+        for (int i = 0; i < 4; i++) {
+            std::vector<Vector3D> temp_points_3d;
+            int count = countPointsInFront(points_0, points_1, M_matrices[i], R_variants[i], t_variants[i], temp_points_3d, K);
+
+            if (count > max_count) {
+                max_count = count;
+                best_R = R_variants[i];
+                best_t = t_variants[i];
+                best_M = M_matrices[i];
+                best_points_3d = temp_points_3d;
+
+            }
+        }
+        R = best_R;
+        t = best_t;
+        points_3d = best_points_3d;
+
+        if (max_count < points_0.size()/2) {
+            std::cerr << "Warning: Less than half of the points are in front of both cameras. Possible issue with reconstruction.\n";
+            std::cout<< "Number of points in front: " << max_count << std::endl;
+        }
+
+        double detR = determinant(best_R);
+        if (std::abs(detR - 1.0) > 1e-6) {
+            std::cerr << "Warning: Rotation matrix determinant is not 1. Possible issue with decomposition.\n";
+            std::cout<< "Determinant of R: " << detR << std::endl;
+        }
+
+        // Create matrix Rt0 from the Identity matrix of R and t where all is 0
+        Matrix34 Rt0(1, 0, 0, 0,
+                    0, 1, 0, 0,
+                    0, 0, 1, 0);
+
+        //create the projection matrix for the first camera
+        Matrix34 M0 = K * Rt0;
+
+        // Compute RMSE and total squared error
+        std::pair<double, double> result = computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M);
+
+        std::cout << "Reprojection RMSE: " << result.first << std::endl;
+        std::cout << "Total Squared Error: " << result.second << std::endl;
+
+        return points_3d.size() > 0;
     }
-    R = best_R;
-    t = best_t;
-    points_3d = best_points_3d;
-
-    if (max_count < points_0.size()/2) {
-        std::cerr << "Warning: Less than half of the points are in front of both cameras. Possible issue with reconstruction.\n";
-        std::cout<< "Number of points in front: " << max_count << std::endl;
-    }
-        
-    double detR = determinant(best_R);
-    if (std::abs(detR - 1.0) > 1e-6) {
-        std::cerr << "Warning: Rotation matrix determinant is not 1. Possible issue with decomposition.\n";
-        std::cout<< "Determinant of R: " << detR << std::endl;
-    }
-
-    // Create matrix Rt0 from the Identity matrix of R and t where all is 0
-    Matrix34 Rt0(1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0);
-        
-    //create the projection matrix for the first camera
-    Matrix34 M0 = K * Rt0;
-
-    // Compute RMSE and total squared error
-    std::pair<double, double> result = computeReprojectionError(points_0, points_1, points_3d, K, M0, best_M);
-
-    std::cout << "Reprojection RMSE: " << result.first << std::endl;
-    std::cout << "Total Squared Error: " << result.second << std::endl;
-
-    return points_3d.size() > 0;
-}
